@@ -129,6 +129,9 @@
   <ItemGroup>
     <ClCompile Include="FTArray.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\FTArray.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
