@@ -157,10 +157,15 @@ public:
 
 		m_nAllocationCount = nNewAllocationCount;
 
+		T* pNewMemory;
 		if (m_pMemory)
-			m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
 		else
-			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+
+		assert(pNewMemory == nullptr);
+
+		m_pMemory = pNewMemory;
 	}
 
 	void EnsureCapacity(const int nNum)
@@ -177,11 +182,15 @@ public:
 
 		m_nAllocationCount = nNum;
 
+		T* pNewMemory;
 		if (m_pMemory)
-
-			m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
 		else
-			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+
+		assert(pNewMemory == nullptr);
+
+		m_pMemory = pNewMemory;
 	}
 
 	void Purge()
@@ -230,13 +239,17 @@ public:
 		if (!m_pMemory)
 		{
 			// Allocation count is non zero, but memory is null.
-			Assert(m_pMemory);
+			assert(m_pMemory != nullptr);
 			return;
 		}
 
 		m_nAllocationCount = nCount;
 
-		m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+		T* pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+
+		assert(pNewMemory == nullptr);
+
+		m_pMemory = pNewMemory;
 	}
 
 private:
@@ -323,7 +336,7 @@ public:
 
 	void ShiftRight(const int nIndex, int nNum = 1)
 	{
-		assert(IsValidIndex(nIndex) || !m_nSize || !nNum);
+		assert(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
 
 		const int nNumToMove = m_nSize - nIndex - nNum;
 		if ((nNumToMove > 0) && (nNum > 0))
