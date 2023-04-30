@@ -23,5 +23,14 @@
     <ClInclude Include="include\FTArray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\ArrayIterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Globals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

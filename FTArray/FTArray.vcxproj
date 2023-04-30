@@ -118,6 +118,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,7 +131,10 @@
     <ClCompile Include="FTArray.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\ArrayIterator.h" />
     <ClInclude Include="include\FTArray.h" />
+    <ClInclude Include="include\Globals.h" />
+    <ClInclude Include="include\Memory.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
