@@ -4,13 +4,13 @@
 
 int main()
 {
-    FTArray<int, 5> Numbers;
+    FTArray<int> Numbers;
     Numbers.AddBack(1);
     Numbers.AddBack(2);
     Numbers.AddBack(3);
     Numbers.AddBack(4);
     Numbers.AddBack(5);
 
-    for (int i = 1; i <= 5; i++)
+     for (size_t i = 0; i < Numbers.GetSize(); i++)
         printf("%i\n", Numbers[i]);
 }

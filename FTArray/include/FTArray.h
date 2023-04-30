@@ -1,128 +1,425 @@
 #pragma once
-#include <cstdlib>
+#include <cassert>
 
-class FTMemoryPool
+namespace details
+{
+	constexpr int INVALID_INDEX = -1;
+}
+
+template<typename T>
+class FTMemory
 {
 public:
-	FTMemoryPool(const size_t nSize, const size_t nBlockSize)
+
+	explicit FTMemory(int nGrowSize = 0, int nInitialAllocationCount = 0)
+		: m_pMemory(nullptr), m_nGrowSize(nGrowSize), m_nAllocationCount(nInitialAllocationCount)
 	{
-		m_nSize = nSize;
-		m_pPtr = Allocate(nSize);
+		assert(nGrowSize >= 0);
+
+		if (m_nAllocationCount)
+			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
 	}
 
-	~FTMemoryPool()
-	{
-		Deallocate(m_pPtr, m_nSize);
-		Destroy();
-	}
-
-	void* Allocate(const size_t nSize) const
-	{
-		const size_t nIndex = nSize / sizeof(void*);
-		if (m_ppFreeList[nIndex] != nullptr)
-		{
-			void* pPtr = m_ppFreeList[nIndex];
-			m_ppFreeList[nIndex] = *(void**)pPtr;
-			return pPtr;
-		}
-
-		return nullptr;
-	}
-
-	void Deallocate(void* pPtr, const size_t nSize) const
-	{
-		*(void**)pPtr = m_ppFreeList[nSize / sizeof(void*)];
-		m_ppFreeList[nSize / sizeof(void*)] = pPtr;
-	}
-
-	void Destroy()
-	{
-		free(m_ppFreeList);
-		free(m_pBuffer);
-		free(this);
-	}
-
-	size_t m_nSize = 0;
-	char* m_pBuffer = nullptr;
-	void** m_ppFreeList = nullptr;
-	void* m_pPtr = nullptr;
-};
-
-// T = var type, N = amount of items in array
-template<typename T, size_t N = 0>
-class FTArray
-{
 	class Iterator
 	{
 	public:
-		explicit Iterator(T* pPtr)
+		explicit Iterator(int i) : m_nIndex(i) {}
+
+		bool operator==(const Iterator it) const
 		{
-			m_pPtr = pPtr;
+			return m_nIndex == it.m_nIndex;
 		}
 
-		Iterator& operator++()
+		bool operator!=(const Iterator it) const
 		{
-			++m_pPtr;
-			return *this;
+			return m_nIndex != it.m_nIndex;
 		}
 
-	private:
-		T* m_pPtr = nullptr;
+		int m_nIndex;
 	};
 
-	static void CreatePool(const size_t nSize, const size_t nBlockSize)
+	Iterator First(Iterator it) const
 	{
-		FTMemoryPool* pPool = (FTMemoryPool*)malloc(sizeof(FTMemoryPool));
-		pPool->m_nSize = nSize;
-		pPool->m_pBuffer = (char*)malloc(nSize);
-		*pPool->m_ppFreeList = malloc((nSize / nBlockSize) * sizeof(void*));
-
-		for (size_t i = 0; i < nSize / nBlockSize; i++)
-			pPool->m_ppFreeList[i] = (void*)(pPool->m_pBuffer + i * nBlockSize);
+		return Iterator(IsIndexValid(0) ? 0 : details::INVALID_INDEX);
 	}
 
-	FTMemoryPool* m_pPool = nullptr;
-	T* m_pArray = nullptr;
-
-public:
-	explicit FTArray()
+	Iterator Next(Iterator it) const
 	{
-		CreatePool(N * sizeof(T), sizeof(T));
-		m_pArray = (T*)m_pPool->m_pPtr;
+		return Iterator(IsIndexValid(it.index + 1) ? it.index + 1 : details::INVALID_INDEX);
 	}
 
-	T operator[](int nIndex)
+	bool IsIndexValid(const int nIndex) const
 	{
-		return m_pArray[nIndex];
+		return (nIndex >= 0) && (nIndex < m_nAllocationCount);
 	}
 
-	void ExtendSize(const size_t nAmount)
+	T& At(int nIndex)
 	{
-		m_nWishPoolSize += nAmount;
-
-		m_pPool->~FTMemoryPool();
-		CreatePool(m_nWishPoolSize, sizeof(T));
+		assert(IsIndexValid(nIndex));
+		return m_pMemory[nIndex];
 	}
 
-	void AddBack(T NewItem)
+	const T& At(int nIndex) const
 	{
-		ExtendSize(sizeof(T));
-		m_pArray[GetBackIndex() + 1] = NewItem;
+		assert(IsIndexValid(nIndex));
+		return m_pMemory[nIndex];
 	}
 
-	size_t GetSize() const
+	T& operator[](const int nIndex)
 	{
-		return m_pPool->m_nSize;
+		return At(nIndex);
 	}
 
-	// EDIT: I don't think this is right
-	size_t GetBackIndex() const
+	const T& operator[](int nIndex) const
 	{
-		// m_pPool / sizeof(T) = total size in bytes / bytes of time,
-		// just like how you need to divide an offset in ida to get the real address
-		return (m_pPool->m_nSize / sizeof(T));
+		return At(nIndex);
+	}
+
+	bool IsExternallyAllocated() const
+	{
+		return (m_nGrowSize < 0);
+	}
+
+	void SetGrowSize(const int nSize)
+	{
+		assert(!IsExternallyAllocated());
+		assert(nSize >= 0);
+		m_nGrowSize = nSize;
+	}
+
+	T* Base()
+	{
+		return m_pMemory;
+	}
+
+	const T* Base() const
+	{
+		return m_pMemory;
+	}
+
+	int GetAllocationCount() const
+	{
+		return m_nAllocationCount;
+	}
+
+	static int CalcNewAllocationCount(int nAllocationCount, const int nGrowSize,
+		const int nNewSize, const int nBytesItem)
+	{
+		if (nGrowSize)
+			nAllocationCount = ((1 + ((nNewSize - 1) / nGrowSize)) * nGrowSize);
+		else
+		{
+			if (!nAllocationCount)
+			{
+				nAllocationCount = (31 + nBytesItem) / nBytesItem;
+
+				if (nAllocationCount < nNewSize)
+					nAllocationCount = nNewSize;
+			}
+
+			while (nAllocationCount < nNewSize)
+			{
+				const int nNewAllocationCount = (nAllocationCount * 9) / 8; // 12.5%
+				if (nNewAllocationCount > nAllocationCount)
+					nAllocationCount = nNewAllocationCount;
+				else
+					nAllocationCount *= 2;
+			}
+		}
+
+		return nAllocationCount;
+	}
+
+	void Grow(const int nNum)
+	{
+		assert(nNum > 0);
+
+		if (IsExternallyAllocated())
+		{
+			assert(0); // Can't grow a buffer whose memory was externally allocated
+			return;
+		}
+
+		const int nAllocationRequested = m_nAllocationCount + nNum;
+		int nNewAllocationCount = CalcNewAllocationCount(m_nAllocationCount, m_nGrowSize,
+			nAllocationRequested, sizeof(T));
+
+		if (nNewAllocationCount < nAllocationRequested)
+		{
+			if (!nNewAllocationCount && (nNewAllocationCount - 1) >= nAllocationRequested)
+				--nNewAllocationCount;
+			else
+			{
+				while (nNewAllocationCount < nAllocationRequested)
+					nNewAllocationCount = (nNewAllocationCount + nAllocationRequested) / 2;
+			}
+		}
+
+		m_nAllocationCount = nNewAllocationCount;
+
+		if (m_pMemory)
+			m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+		else
+			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+	}
+
+	void EnsureCapacity(const int nNum)
+	{
+		if (m_nAllocationCount >= nNum)
+			return;
+
+		if (IsExternallyAllocated())
+		{
+			// Can't grow a buffer whose memory was externally allocated 
+			assert(0);
+			return;
+		}
+
+		m_nAllocationCount = nNum;
+
+		if (m_pMemory)
+
+			m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+		else
+			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+	}
+
+	void Purge()
+	{
+		if (!IsExternallyAllocated())
+		{
+			if (m_pMemory)
+			{
+				free((void*)m_pMemory);
+				m_pMemory = nullptr;
+			}
+
+			m_nAllocationCount = 0;
+		}
+	}
+
+	void Purge(const int nCount)
+	{
+		assert(nCount >= 0);
+
+		if (nCount > m_nAllocationCount)
+		{
+			// Ensure this isn't a grow request in disguise.
+			assert(nCount <= m_nAllocationCount);
+			return;
+		}
+
+		// If we have zero elements, simply do a purge:
+		if (nCount == 0)
+		{
+			Purge();
+			return;
+		}
+
+		if (IsExternallyAllocated())
+		{
+			// Can't shrink a buffer whose memory was externally allocated, fail silently like purge 
+			return;
+		}
+
+		// If the number of elements is the same as the allocation count, we are done.
+		if (nCount == m_nAllocationCount)
+			return;
+
+
+		if (!m_pMemory)
+		{
+			// Allocation count is non zero, but memory is null.
+			Assert(m_pMemory);
+			return;
+		}
+
+		m_nAllocationCount = nCount;
+
+		m_pMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
 	}
 
 private:
-	size_t m_nWishPoolSize;
+
+	T* m_pMemory = nullptr;
+	int m_nGrowSize = 0;
+	int m_nAllocationCount = 0;
+};
+
+template<typename T>
+class FTArray
+{
+private:
+	static void Destruct( T *pMemory )
+	{
+		pMemory->~T( );
+	}
+
+	static T* Construct(T* pMemory)
+	{
+		return ::new(pMemory) T;
+	}
+
+	static T* CopyConstruct(T* pMemory, T const& Src)
+	{
+		return ::new(pMemory) T(Src);
+	}
+
+	int InsertBefore(const int nIndex)
+	{
+		assert(nIndex == GetSize() || IsValidIndex(nIndex));
+
+		Grow();
+		ShiftRight(nIndex);
+		Construct(&At(nIndex));
+		return nIndex;
+	}
+
+	int InsertBefore(int nIndex, const T& src)
+	{
+		assert(nIndex == GetSize() || IsValidIndex(nIndex));
+
+		Grow();
+		ShiftRight(nIndex);
+		CopyConstruct(&At(nIndex), src);
+		return nIndex;
+	}
+
+public:
+	T* GetBase()
+	{
+		return m_Memory.Base();
+	}
+
+	const T* GetBase() const
+	{
+		return m_Memory.Base();
+	}
+
+	T& At(int nIndex)
+	{
+		return m_Memory[nIndex];
+	}
+
+	const T& At(int nIndex) const
+	{
+		return m_Memory[nIndex];
+	}
+
+	T& operator[](const int nIndex)
+	{
+		return At(nIndex);
+	}
+
+	const T& operator[](int nIndex) const
+	{
+		return At(nIndex);
+	}
+
+	bool IsValidIndex(const int nIndex) const
+	{
+		return (nIndex >= 0) && (nIndex < m_nSize);
+	}
+
+	void ShiftRight(const int nIndex, int nNum = 1)
+	{
+		assert(IsValidIndex(nIndex) || !m_nSize || !nNum);
+
+		const int nNumToMove = m_nSize - nIndex - nNum;
+		if ((nNumToMove > 0) && (nNum > 0))
+			memmove(&At(nIndex + nNum), &At(nIndex), nNumToMove * sizeof(T));
+	}
+
+	void ShiftLeft(const int nIndex, int nNum = 1)
+	{
+		assert(IsValidIndex(nIndex) || !m_nSize || !nNum);
+
+		const int nNumToMove = m_nSize - nIndex - nNum;
+		if ((nNumToMove > 0) && (nNum > 0))
+			memmove(&At(nIndex), &At(nIndex + nNum), nNumToMove * sizeof(T));
+	}
+
+	void Grow(const int nNum = 1)
+	{
+		if (m_nSize + nNum > m_Memory.GetAllocationCount())
+			m_Memory.Grow(m_nSize + nNum - m_Memory.GetAllocationCount());
+
+		m_nSize += nNum;
+	}
+
+	int AddBegin()
+	{
+		return InsertBefore(0);
+	}
+
+	int AddBegin(const T& Src)
+	{
+		return InsertBefore(0, Src);
+	}
+
+	int AddBack()
+	{
+		return InsertBefore(m_nSize);
+	}
+
+	int AddBack(const T& Src)
+	{
+		return InsertBefore(m_nSize, Src);
+	}
+
+	int Find(const T& Src)
+	{
+		for (int i = 0; i < GetSize(); i++)
+		{
+			if (At(i) == Src)
+				return i;
+		}
+
+		return details::INVALID_INDEX;
+	}
+
+	void Remove(const int nIndex)
+	{
+		Destruct(&At(nIndex));
+		ShiftLeft(nIndex);
+		m_nSize--;
+	}
+
+	class Iterator
+	{
+	public:
+		explicit Iterator(int i) : m_nIndex(i) {}
+
+		bool operator==(const Iterator it) const
+		{
+			return m_nIndex == it.m_nIndex;
+		}
+
+		bool operator!=(const Iterator it) const
+		{
+			return m_nIndex != it.m_nIndex;
+		}
+
+		int m_nIndex;
+	};
+
+	Iterator Begin()
+	{
+		return GetBase();
+	}
+
+	Iterator End()
+	{
+		return GetBase() + GetSize();
+	}
+
+	int GetSize() const
+	{
+		return m_nSize;
+	}
+
+private:
+	FTMemory<T> m_Memory;
+	int m_nSize = 0;
+	T* m_pElements = nullptr;
 };
