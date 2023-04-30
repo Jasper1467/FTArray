@@ -79,6 +79,31 @@ public:
 		return At(nIndex);
 	}
 
+	FTArray<T>& operator=(const FTArray<T>& Other)
+	{
+		if (this == Other)
+			return *this;
+
+		// Deallocate current memory
+        for (int i = 0; i < m_nSize; i++)
+        {
+            Destruct(&At(i));
+        }
+        m_nSize = 0;
+        m_Memory.Purge();
+        m_pElements = nullptr;
+
+        // Allocate new memory
+        m_nSize = Other.GetSize();
+        m_pElements = m_Memory.Alloc(m_nSize);
+
+        // Copy construct elements
+        for (int i = 0; i < m_nSize; i++)
+            CopyConstruct(&At(i), Other.At(i));
+
+		return *this;
+	}
+
 	bool IsValidIndex(const int nIndex) const
 	{
 		return (nIndex >= 0) && (nIndex < m_nSize);
@@ -95,7 +120,7 @@ public:
 
 	void ShiftLeft(const int nIndex, int nNum = 1)
 	{
-		assert(IsValidIndex(nIndex) || !m_nSize || !nNum);
+		assert(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
 
 		const int nNumToMove = m_nSize - nIndex - nNum;
 		if ((nNumToMove > 0) && (nNum > 0))
