@@ -18,4 +18,10 @@ int main()
 		printf("%i\n", Numbers[i]);
 
 	printf("5 is found at index: %i\n", Numbers.Find(5));
+	printf("Sorting:\n");
+
+	Numbers.QuickSort();
+
+	for (size_t i = 0; i < Numbers.GetSize(); i++)
+		printf("%i\n", Numbers[i]);
 }

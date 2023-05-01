@@ -311,6 +311,44 @@ public:
 			thread.join();
 	}
 
+	void QuickSort(int nLow, int nHigh)
+	{
+		auto Partition = [](FTMemory<T>& arr, int low, int high) -> int
+		{
+			T pivot = arr[high];
+			int i = (low - 1);
+
+			for (int j = low; j <= high - 1; j++)
+			{
+				if (arr[j] < pivot)
+				{
+					i++;
+					std::swap(arr[i], arr[j]);
+				}
+			}
+
+			std::swap(arr[i + 1], arr[high]);
+			return (i + 1);
+		};
+
+		assert(isdigit(At(0))); // This function is only for numbers
+		assert(GetSize() < nHigh);
+
+		if (nLow >= nHigh)
+			return;
+
+		int nPivotPosition = Partition(m_Memory, nLow, nHigh);
+
+		QuickSort(nLow, nPivotPosition - 1);
+		QuickSort(nPivotPosition + 1, nHigh);
+	}
+
+	void QuickSort()
+	{
+		assert(isdigit(At(0))); // This function is only for numbers
+		QuickSort(0, GetSize() - 1);
+	}
+
 private:
 	FTMemory<T> m_Memory;
 	int m_nSize = 0;
