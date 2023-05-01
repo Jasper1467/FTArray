@@ -149,14 +149,24 @@ public:
 		m_nSize += nNum;
 	}
 
-	int AddBegin()
+	int AddFront()
 	{
 		return InsertBefore(0);
 	}
 
-	int AddBegin(const T& Src)
+	int AddFront(const T& Src)
 	{
 		return InsertBefore(0, Src);
+	}
+
+	int RemoveFront()
+	{
+		return Remove(0);
+	}
+
+	int RemoveFront(const T& Src)
+	{
+		return Remove(0, Src);
 	}
 
 	int AddBack()
@@ -167,6 +177,16 @@ public:
 	int AddBack(const T& Src)
 	{
 		return InsertBefore(m_nSize, Src);
+	}
+
+	int RemoveBack()
+	{
+		return Remove(m_nSize);
+	}
+
+	int RemoveBack(const T& Src)
+	{
+		return Remove(m_nSize, Src);
 	}
 
 	int Find(const T& Src)
@@ -250,7 +270,8 @@ public:
 		for (int i = 0; i < nNumThreads - 1; ++i)
 			ChunkSizes[i] = nChunkSize;
 
-		ChunkSizes[nNumThreads - 1] = nSize - nChunkSize * (static_cast<long long>(nNumThreads) - 1);
+		ChunkSizes[static_cast<std::vector<ptrdiff_t, std::allocator<ptrdiff_t>>::size_type>(
+			nNumThreads) - 1] = nSize - nChunkSize * (static_cast<long long>(nNumThreads) - 1);
 
 		std::vector<FTArrayIterator<T>> ChunkStarts(nNumThreads);
 		ChunkStarts[0] = First;
