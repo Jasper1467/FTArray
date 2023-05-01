@@ -15,7 +15,7 @@ public:
 		assert(nGrowSize >= 0);
 
 		if (m_nAllocationCount)
-			m_pMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+			m_pMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 	}
 
 	class Iterator
@@ -117,11 +117,11 @@ public:
 
 			while (nAllocationCount < nNewSize)
 			{
-				const int nNewAllocationCount = (nAllocationCount * 9) / 8; // 12.5%
-				if (nNewAllocationCount > nAllocationCount)
-					nAllocationCount = nNewAllocationCount;
-				else
-					nAllocationCount *= 2;
+				const int nNewAllocationCount = (nAllocationCount >> 3)
+					+ (nAllocationCount >> 4) + nAllocationCount; // 1/8 + 1/16 + 1 = 1.3125
+
+				nAllocationCount = (nNewAllocationCount < nAllocationCount) 
+					? (nAllocationCount << 1) : nNewAllocationCount;
 			}
 		}
 
@@ -157,9 +157,9 @@ public:
 
 		T* pNewMemory;
 		if (m_pMemory)
-			pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 		else
-			pNewMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 
 		assert(pNewMemory == nullptr);
 
@@ -182,9 +182,9 @@ public:
 
 		T* pNewMemory;
 		if (m_pMemory)
-			pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 		else
-			pNewMemory = (T*)malloc(m_nAllocationCount * sizeof(T));
+			pNewMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 
 		assert(pNewMemory == nullptr);
 
@@ -243,7 +243,7 @@ public:
 
 		m_nAllocationCount = nCount;
 
-		T* pNewMemory = (T*)realloc(m_pMemory, m_nAllocationCount * sizeof(T));
+		T* pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
 
 		assert(pNewMemory == nullptr);
 

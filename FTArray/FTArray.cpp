@@ -11,7 +11,8 @@ int main()
     Numbers.AddBack(9);
     Numbers.AddBack(10);
 
-    Numbers.RandomShuffle(Numbers.Begin(), Numbers.End(), 4);
+    const int nNumThreads = std::thread::hardware_concurrency();
+    Numbers.RandomShuffle(Numbers.Begin(), Numbers.End(), nNumThreads);
 
      for (size_t i = 0; i < Numbers.GetSize(); i++)
         printf("%i\n", Numbers[i]);

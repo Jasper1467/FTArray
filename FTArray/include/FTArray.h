@@ -50,6 +50,13 @@ private:
 	}
 
 public:
+	FTArray(FTArray<T>& Other)
+	{
+		this->m_Memory = Other.m_Memory;
+		this->m_nSize = Other.m_nSize;
+		this->m_pElements = Other.m_pElements;
+	}
+
 	FTArray(std::initializer_list<T> List)
 	{
 		for (auto Item : List)
@@ -235,20 +242,22 @@ public:
 		const std::ptrdiff_t nSize = Last - First;
 
 		std::vector<std::thread> Threads;
-		Threads.reserve(nNumThreads);
+		Threads.reserve(static_cast<size_t>(nNumThreads));
 
 		std::vector<std::ptrdiff_t> ChunkSizes(nNumThreads);
-		const std::ptrdiff_t nChunkSize = nSize / nNumThreads;
+		const std::ptrdiff_t nChunkSize = nSize / static_cast<std::ptrdiff_t>(nNumThreads);
 
 		for (int i = 0; i < nNumThreads - 1; ++i)
 			ChunkSizes[i] = nChunkSize;
 
-		ChunkSizes[nNumThreads - 1] = nSize - nChunkSize * (nNumThreads - 1);
+		ChunkSizes[nNumThreads - 1] = nSize - nChunkSize * (static_cast<long long>(nNumThreads) - 1);
 
 		std::vector<FTArrayIterator<T>> ChunkStarts(nNumThreads);
 		ChunkStarts[0] = First;
 		for (int i = 1; i < nNumThreads; ++i)
-			ChunkStarts[i] = ChunkStarts[i - 1] + ChunkSizes[i - 1];
+			ChunkStarts[i] =
+			ChunkStarts[i - 1] + ChunkSizes[
+				static_cast<std::vector<ptrdiff_t, std::allocator<ptrdiff_t>>::size_type>(i) - 1];
 
 		typedef typename std::iterator_traits<FTArrayIterator<T>>::difference_type diff_t;
 		typedef std::uniform_int_distribution<diff_t> distr_t;
@@ -270,9 +279,9 @@ public:
 						const std::ptrdiff_t k = dist(gen);
 
 						if (std::is_trivial<decltype(ChunkFirst)>())
-							std::swap(ChunkFirst[i], ChunkFirst[k]);
+							std::swap(ChunkFirst[j], ChunkFirst[k]);
 						else
-							std::iter_swap(ChunkFirst + i, ChunkFirst + k);
+							std::iter_swap(ChunkFirst + j, ChunkFirst + k);
 					}
 				});
 		}
