@@ -2,7 +2,8 @@
 #include <iterator>
 
 template<typename T>
-class FTArrayIterator {
+class FTArrayIterator
+{
 public:
     using iterator_category = std::random_access_iterator_tag;
     using value_type = T;
@@ -10,29 +11,29 @@ public:
     using pointer = T*;
     using reference = T&;
 
-    FTArrayIterator() = default;
-    FTArrayIterator(T* ptr) : m_ptr(ptr) {}
+    explicit FTArrayIterator(T* pPtr) : m_pPtr(pPtr) {}
+    FTArrayIterator() : m_pPtr(nullptr) {}
 
-    FTArrayIterator& operator++() { ++m_ptr; return *this; }
-    FTArrayIterator operator++(int) { FTArrayIterator tmp = *this; ++m_ptr; return tmp; }
-    FTArrayIterator& operator--() { --m_ptr; return *this; }
-    FTArrayIterator operator--(int) { FTArrayIterator tmp = *this; --m_ptr; return tmp; }
+    FTArrayIterator& operator++() { ++m_pPtr; return *this; }
+    FTArrayIterator operator++(int) { FTArrayIterator tmp = *this; ++m_pPtr; return tmp; }
+    FTArrayIterator& operator--() { --m_pPtr; return *this; }
+    FTArrayIterator operator--(int) { FTArrayIterator tmp = *this; --m_pPtr; return tmp; }
 
-    reference operator*() { return *m_ptr; }
-    pointer operator->() { return m_ptr; }
+    reference operator*() { return *m_pPtr; }
+    pointer operator->() { return m_pPtr; }
 
-    bool operator==(const FTArrayIterator& rhs) const { return m_ptr == rhs.m_ptr; }
-    bool operator!=(const FTArrayIterator& rhs) const { return m_ptr != rhs.m_ptr; }
+    bool operator==(const FTArrayIterator& rhs) const { return m_pPtr == rhs.m_pPtr; }
+    bool operator!=(const FTArrayIterator& rhs) const { return m_pPtr != rhs.m_pPtr; }
 
-    FTArrayIterator operator+(difference_type n) const { return FTArrayIterator(m_ptr + n); }
-    FTArrayIterator operator-(difference_type n) const { return FTArrayIterator(m_ptr - n); }
-    difference_type operator-(const FTArrayIterator& rhs) const { return m_ptr - rhs.m_ptr; }
+    FTArrayIterator operator+(difference_type n) const { return FTArrayIterator(m_pPtr + n); }
+    FTArrayIterator operator-(difference_type n) const { return FTArrayIterator(m_pPtr - n); }
+    difference_type operator-(const FTArrayIterator& rhs) const { return m_pPtr - rhs.m_pPtr; }
 
-    FTArrayIterator& operator+=(difference_type n) { m_ptr += n; return *this; }
-    FTArrayIterator& operator-=(difference_type n) { m_ptr -= n; return *this; }
+    FTArrayIterator& operator+=(difference_type n) { m_pPtr += n; return *this; }
+    FTArrayIterator& operator-=(difference_type n) { m_pPtr -= n; return *this; }
 
-    reference operator[](difference_type n) const { return m_ptr[n]; }
+    reference operator[](difference_type n) const { return m_pPtr[n]; }
 
 private:
-    T* m_ptr;
+    T* m_pPtr;
 };

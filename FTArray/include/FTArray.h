@@ -182,12 +182,12 @@ public:
 
 	FTArrayIterator<T> Begin()
 	{
-		return GetBase();
+		return FTArrayIterator<T>(GetBase());
 	}
 
 	FTArrayIterator<T> End()
 	{
-		return GetBase() + GetSize();
+		return FTArrayIterator<T>(GetBase() + GetSize());
 	}
 
 	int GetSize() const
@@ -223,9 +223,15 @@ public:
 		}
 	}
 
-	// This is the multi threaded version
+	/* This is the multi threaded version
+	 * IMPORTANT: When nNumThreads is higher than the maximum supported be hardware,
+	 * weird stuff happens, also happens if nNumThreads isn't even (except 1)
+	 */
 	void RandomShuffle(FTArrayIterator<T> First, FTArrayIterator<T> Last, int nNumThreads)
 	{
+		// nNumThreads is higher than supported by hardware
+		assert(nNumThreads <= std::thread::hardware_concurrency());
+
 		const std::ptrdiff_t nSize = Last - First;
 
 		std::vector<std::thread> Threads;
