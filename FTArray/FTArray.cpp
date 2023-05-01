@@ -4,14 +4,14 @@
 
 int main()
 {
-    FTArray<int> Numbers;
-    Numbers.AddBack(1);
-    Numbers.AddBack(2);
-    Numbers.AddBack(3);
-    Numbers.AddBack(4);
-    Numbers.AddBack(5);
+    FTArray<int> Numbers = { 1, 2, 3, 4, 5 };
+    Numbers.AddBack(6);
+    Numbers.AddBack(7);
+    Numbers.AddBack(8);
+    Numbers.AddBack(9);
+    Numbers.AddBack(10);
 
-    Numbers.RandomShuffle(Numbers.Begin(), Numbers.End());
+    Numbers.RandomShuffle(Numbers.Begin(), Numbers.End(), 5);
 
      for (size_t i = 0; i < Numbers.GetSize(); i++)
         printf("%i\n", Numbers[i]);

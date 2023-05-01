@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include <random>
+#include <thread>
 #include <vector>
 #include <utility>
 #include <type_traits>
@@ -49,6 +50,12 @@ private:
 	}
 
 public:
+	FTArray(std::initializer_list<T> List)
+	{
+		for (auto Item : List)
+			AddBack(Item);
+	}
+
 	T* GetBase()
 	{
 		return m_Memory.Base();
@@ -85,21 +92,21 @@ public:
 			return *this;
 
 		// Deallocate current memory
-        for (int i = 0; i < m_nSize; i++)
-        {
-            Destruct(&At(i));
-        }
-        m_nSize = 0;
-        m_Memory.Purge();
-        m_pElements = nullptr;
+		for (int i = 0; i < m_nSize; i++)
+		{
+			Destruct(&At(i));
+		}
+		m_nSize = 0;
+		m_Memory.Purge();
+		m_pElements = nullptr;
 
-        // Allocate new memory
-        m_nSize = Other.GetSize();
-        m_pElements = m_Memory.Alloc(m_nSize);
+		// Allocate new memory
+		m_nSize = Other.GetSize();
+		m_pElements = m_Memory.Alloc(m_nSize);
 
-        // Copy construct elements
-        for (int i = 0; i < m_nSize; i++)
-            CopyConstruct(&At(i), Other.At(i));
+		// Copy construct elements
+		for (int i = 0; i < m_nSize; i++)
+			CopyConstruct(&At(i), Other.At(i));
 
 		return *this;
 	}
@@ -201,22 +208,71 @@ public:
 	{
 		std::random_device rd;
 		std::mt19937 gen(rd());
-		std::uniform_int_distribution<std::ptrdiff_t> dist;
 
-		std::vector<bool> Used(Last - First, false);
-		for (std::ptrdiff_t i = Last - First - 1; i > 0; --i)
+		typedef typename std::iterator_traits<FTArrayIterator<T>>::difference_type diff_t;
+		typedef std::uniform_int_distribution<diff_t> distr_t;
+		typedef typename distr_t::param_type param_t;
+
+		distr_t D;
+		for (diff_t i = Last - First - 1; i > 0; --i)
 		{
-			auto j = dist(gen, decltype(dist)::param_type(0, i));
-			while (Used[j])
-				j = dist(gen, decltype(dist)::param_type(0, i));
-
-			Used[j] = true;
-
-			if constexpr (std::is_trivially_copyable_v<decltype(*First)>)
-				std::swap(First[i], First[j]);
+			if (std::is_trivial<decltype(*First)>())
+				std::swap(First[i], First[D(gen, param_t(0, i))]);
 			else
-				std::iter_swap(First + i, First + j);
+				std::iter_swap(First + i, First + D(gen, param_t(0, i)));
 		}
+	}
+
+	// This is the multi threaded version
+	void RandomShuffle(FTArrayIterator<T> First, FTArrayIterator<T> Last, int nNumThreads)
+	{
+		const std::ptrdiff_t nSize = Last - First;
+
+		std::vector<std::thread> Threads;
+		Threads.reserve(nNumThreads);
+
+		std::vector<std::ptrdiff_t> ChunkSizes(nNumThreads);
+		const std::ptrdiff_t nChunkSize = nSize / nNumThreads;
+
+		for (int i = 0; i < nNumThreads - 1; ++i)
+			ChunkSizes[i] = nChunkSize;
+
+		ChunkSizes[nNumThreads - 1] = nSize - nChunkSize * (nNumThreads - 1);
+
+		std::vector<FTArrayIterator<T>> ChunkStarts(nNumThreads);
+		ChunkStarts[0] = First;
+		for (int i = 1; i < nNumThreads; ++i)
+			ChunkStarts[i] = ChunkStarts[i - 1] + ChunkSizes[i - 1];
+
+		typedef typename std::iterator_traits<FTArrayIterator<T>>::difference_type diff_t;
+		typedef std::uniform_int_distribution<diff_t> distr_t;
+		typedef typename distr_t::param_type param_t;
+
+		std::random_device rd;
+		std::mt19937 gen(rd());
+
+		for (int i = 0; i < nNumThreads; ++i)
+		{
+			Threads.emplace_back([&ChunkStarts, &ChunkSizes, &gen, i]()
+				{
+					const FTArrayIterator<T> ChunkFirst = ChunkStarts[i];
+					const FTArrayIterator<T> ChunkLast = ChunkFirst + ChunkSizes[i];
+
+					std::uniform_int_distribution<std::ptrdiff_t> dist(0, ChunkSizes[i] - 1);
+					for (std::ptrdiff_t j = ChunkSizes[i] - 1; j > 0; --j)
+					{
+						const std::ptrdiff_t k = dist(gen);
+
+						if (std::is_trivial<decltype(ChunkFirst)>())
+							std::swap(ChunkFirst[i], ChunkFirst[k]);
+						else
+							std::iter_swap(ChunkFirst + i, ChunkFirst + k);
+					}
+				});
+		}
+
+		for (std::thread& thread : Threads)
+			thread.join();
 	}
 
 private:

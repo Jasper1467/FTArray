@@ -9,7 +9,7 @@ class FTMemory
 {
 public:
 
-	explicit FTMemory(const int nGrowSize = 0, int nInitialAllocationCount = 0)
+	explicit FTMemory(const int nGrowSize = 0, const int nInitialAllocationCount = 0)
 		: m_pMemory(nullptr), m_nGrowSize(nGrowSize), m_nAllocationCount(nInitialAllocationCount)
 	{
 		assert(nGrowSize >= 0);
