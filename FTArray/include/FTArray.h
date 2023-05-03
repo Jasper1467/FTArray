@@ -39,7 +39,7 @@ private:
 		return nIndex;
 	}
 
-	int InsertBefore(int nIndex, const T& src)
+	int InsertBefore(const int nIndex, const T& src)
 	{
 		assert(nIndex == GetSize() || IsValidIndex(nIndex));
 
@@ -50,7 +50,7 @@ private:
 	}
 
 public:
-	FTArray(FTArray<T>& Other)
+	explicit FTArray(FTArray<T>& Other)
 	{
 		this->m_Memory = Other.m_Memory;
 		this->m_nSize = Other.m_nSize;

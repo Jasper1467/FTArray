@@ -68,7 +68,7 @@ public:
 		return At(nIndex);
 	}
 
-	const T& operator[](int nIndex) const
+	const T& operator[](const int nIndex) const
 	{
 		return At(nIndex);
 	}
@@ -149,7 +149,8 @@ public:
 			else
 			{
 				while (nNewAllocationCount < nAllocationRequested)
-					nNewAllocationCount = (nNewAllocationCount + nAllocationRequested) / 2;
+					nNewAllocationCount *= 2;
+					//nNewAllocationCount = (nNewAllocationCount + nAllocationRequested) / 2;
 			}
 		}
 
@@ -157,9 +158,9 @@ public:
 
 		T* pNewMemory;
 		if (m_pMemory)
-			pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+			pNewMemory = (T*)_aligned_realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 		else
-			pNewMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+			pNewMemory = (T*)_aligned_malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 
 		assert(pNewMemory == nullptr);
 

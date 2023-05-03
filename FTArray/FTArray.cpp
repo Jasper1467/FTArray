@@ -1,27 +1,68 @@
 #include <iostream>
+#include <chrono>
 
 #include "include/FTArray.h"
 
+double mticks()
+{
+	typedef std::chrono::high_resolution_clock clock;
+	typedef std::chrono::duration<float, std::milli> duration;
+
+	static clock::time_point start = clock::now();
+	const duration elapsed = clock::now() - start;
+	return elapsed.count();
+}
+
+#define TEST_AMOUNT 1000
+
+double g_dbResults[TEST_AMOUNT] = {};
+
+void Benchmark(const int nTestNum)
+{
+	FTArray<int> Array = {};
+	std::vector<int> Vector = {};
+
+	typedef std::chrono::high_resolution_clock clock;
+	typedef std::chrono::duration<float, std::milli> duration;
+
+	const clock::time_point VectorStart = clock::now();
+	while (Vector.size() != 10000)
+	{
+		Vector.push_back(1);
+	}
+	const duration VectorDuration = clock::now() - VectorStart;
+
+	printf("%i: Vector took %f milliseconds\n", nTestNum, VectorDuration.count());
+
+		const clock::time_point ArrayStart = clock::now();
+	while (Array.GetSize() != 10000)
+	{
+		Array.AddBack(1);
+	}
+	const duration ArrayDuration = clock::now() - ArrayStart;
+
+	printf("%i: FTArray took %f milliseconds\n", nTestNum, ArrayDuration.count());
+
+	g_dbResults[nTestNum] = VectorDuration.count() + ArrayDuration.count();
+}
+
 int main()
 {
-	FTArray<int> Numbers = { 1, 2, 3, 4, 5 };
-	Numbers.AddBack(6);
-	Numbers.AddBack(7);
-	Numbers.AddBack(8);
-	Numbers.AddBack(9);
-	Numbers.AddBack(10);
+	for (int i = 0; i < TEST_AMOUNT; i++)
+	{
+		Benchmark(i);
+	}
 
-	const int nNumThreads = std::thread::hardware_concurrency();
-	Numbers.RandomShuffle(Numbers.Begin(), Numbers.End(), nNumThreads);
+	double dbAverage = 0.0;
+	for (int i = 0; i < TEST_AMOUNT; i++)
+	{
+		dbAverage += g_dbResults[i];
+	}
 
-	for (size_t i = 0; i < Numbers.GetSize(); i++)
-		printf("%i\n", Numbers[i]);
+	dbAverage /= TEST_AMOUNT;
 
-	printf("5 is found at index: %i\n", Numbers.Find(5));
-	printf("Sorting:\n");
-
-	Numbers.QuickSort();
-
-	for (size_t i = 0; i < Numbers.GetSize(); i++)
-		printf("%i\n", Numbers[i]);
+	if (dbAverage < 0.0)
+		printf("Vector was on average %f faster\n", dbAverage);
+	else
+		printf("FTArray was on average %f faster\n", dbAverage);
 }
