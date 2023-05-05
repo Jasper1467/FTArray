@@ -1,5 +1,4 @@
 #pragma once
-#include <cassert>
 #include <Windows.h>
 
 #include "Globals.h"
@@ -12,10 +11,10 @@ public:
 	explicit FTMemory(const int nGrowSize = 0, const int nInitialAllocationCount = 0)
 		: m_pMemory(nullptr), m_nGrowSize(nGrowSize), m_nAllocationCount(nInitialAllocationCount)
 	{
-		assert(nGrowSize >= 0);
+		FT_ASSERT(nGrowSize >= 0);
 
 		if (m_nAllocationCount)
-			m_pMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+			m_pMemory = (T*)_aligned_malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 	}
 
 	class Iterator
@@ -38,12 +37,12 @@ public:
 
 	Iterator First(Iterator it) const
 	{
-		return Iterator(IsIndexValid(0) ? 0 : details::INVALID_INDEX);
+		return Iterator(IsIndexValid(0) ? 0 : FT_INVALID_INDEX);
 	}
 
 	Iterator Next(Iterator it) const
 	{
-		return Iterator(IsIndexValid(it.index + 1) ? it.index + 1 : details::INVALID_INDEX);
+		return Iterator(IsIndexValid(it.index + 1) ? it.index + 1 : FT_INVALID_INDEX);
 	}
 
 	bool IsIndexValid(const int nIndex) const
@@ -53,13 +52,13 @@ public:
 
 	T& At(int nIndex)
 	{
-		assert(IsIndexValid(nIndex));
+		FT_ASSERT(IsIndexValid(nIndex));
 		return m_pMemory[nIndex];
 	}
 
 	const T& At(int nIndex) const
 	{
-		assert(IsIndexValid(nIndex));
+		FT_ASSERT(IsIndexValid(nIndex));
 		return m_pMemory[nIndex];
 	}
 
@@ -80,8 +79,8 @@ public:
 
 	void SetGrowSize(const int nSize)
 	{
-		assert(!IsExternallyAllocated());
-		assert(nSize >= 0);
+		FT_ASSERT(!IsExternallyAllocated());
+		FT_ASSERT(nSize >= 0);
 		m_nGrowSize = nSize;
 	}
 
@@ -100,16 +99,32 @@ public:
 		return m_nAllocationCount;
 	}
 
-	static int CalcNewAllocationCount(int nAllocationCount, const int nGrowSize,
-		const int nNewSize, const int nBytesItem)
+	int CalcNewAllocationCount(int nAllocationCount, const int nGrowSize,
+		const int nNewSize, const int nBytesItem) const
 	{
+		// https://github.com/Jasper1467/BitManipulation/blob/master/BitManipulation/include/BitManipulation.h#L11
+
 		if (nGrowSize)
-			nAllocationCount = ((1 + ((nNewSize - 1) / nGrowSize)) * nGrowSize);
+		{
+			// If nGrowSize is a power of 2, we can use bitwise instead of division
+			if (m_bGrowSizeIsPowerOf2)
+				nAllocationCount = ((1 + ((nNewSize & ~(nNewSize - 1)) / nGrowSize)) * nGrowSize);
+			else
+				nAllocationCount = ((1 + ((nNewSize - 1) / nGrowSize)) * nGrowSize);
+		}
 		else
 		{
 			if (!nAllocationCount)
 			{
-				nAllocationCount = (31 + nBytesItem) / nBytesItem;
+				if (m_bGrowSizeIsPowerOf2)
+				{
+					nAllocationCount = (FT_ALLOC_SIZE_PRIME + nBytesItem) >> 5;
+
+					// Add 1 if nBytesItem * nAllocationCount < FT_ALLOC_SIZE_PRIME
+					nAllocationCount += ((nBytesItem * nAllocationCount) < FT_ALLOC_SIZE_PRIME);
+				}
+				else
+					nAllocationCount = (FT_ALLOC_SIZE_PRIME + nBytesItem) / nBytesItem;
 
 				if (nAllocationCount < nNewSize)
 					nAllocationCount = nNewSize;
@@ -117,10 +132,11 @@ public:
 
 			while (nAllocationCount < nNewSize)
 			{
+				
 				const int nNewAllocationCount = (nAllocationCount >> 3)
 					+ (nAllocationCount >> 4) + nAllocationCount; // 1/8 + 1/16 + 1 = 1.3125
 
-				nAllocationCount = (nNewAllocationCount < nAllocationCount) 
+				nAllocationCount = (nNewAllocationCount < nAllocationCount)
 					? (nAllocationCount << 1) : nNewAllocationCount;
 			}
 		}
@@ -128,15 +144,17 @@ public:
 		return nAllocationCount;
 	}
 
-	void Grow(const int nNum)
+	void Grow(const int nNum, const bool bUsePowerOfTwoGrowth = true)
 	{
-		assert(nNum > 0);
+		FT_ASSERT(nNum > 0);
 
 		if (IsExternallyAllocated())
 		{
-			assert(0); // Can't grow a buffer whose memory was externally allocated
+			FT_ASSERT(0); // Can't grow a buffer whose memory was externally allocated
 			return;
 		}
+
+		m_bGrowSizeIsPowerOf2 = m_nGrowSize && (!m_nGrowSize & (m_nGrowSize - 1));
 
 		const int nAllocationRequested = m_nAllocationCount + nNum;
 		int nNewAllocationCount = CalcNewAllocationCount(m_nAllocationCount, m_nGrowSize,
@@ -149,8 +167,13 @@ public:
 			else
 			{
 				while (nNewAllocationCount < nAllocationRequested)
-					nNewAllocationCount *= 2;
-					//nNewAllocationCount = (nNewAllocationCount + nAllocationRequested) / 2;
+				{
+					if (bUsePowerOfTwoGrowth)
+						// Use power of two growth strategy
+						nNewAllocationCount = nNewAllocationCount << 1; // Equivalent of *= 2
+					else
+						nNewAllocationCount = (nNewAllocationCount + nAllocationRequested) / 2;
+				}
 			}
 		}
 
@@ -162,7 +185,7 @@ public:
 		else
 			pNewMemory = (T*)_aligned_malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 
-		assert(pNewMemory == nullptr);
+		FT_ASSERT(pNewMemory == nullptr);
 
 		m_pMemory = pNewMemory;
 	}
@@ -175,7 +198,7 @@ public:
 		if (IsExternallyAllocated())
 		{
 			// Can't grow a buffer whose memory was externally allocated 
-			assert(0);
+			FT_ASSERT(0);
 			return;
 		}
 
@@ -183,11 +206,11 @@ public:
 
 		T* pNewMemory;
 		if (m_pMemory)
-			pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+			pNewMemory = (T*)_aligned_realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 		else
-			pNewMemory = (T*)malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+			pNewMemory = (T*)_aligned_malloc(static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 
-		assert(pNewMemory == nullptr);
+		FT_ASSERT(pNewMemory == nullptr);
 
 		m_pMemory = pNewMemory;
 	}
@@ -198,7 +221,7 @@ public:
 		{
 			if (m_pMemory)
 			{
-				free((void*)m_pMemory);
+				free(m_pMemory);
 				m_pMemory = nullptr;
 			}
 
@@ -208,12 +231,12 @@ public:
 
 	void Purge(const int nCount)
 	{
-		assert(nCount >= 0);
+		FT_ASSERT(nCount >= 0);
 
 		if (nCount > m_nAllocationCount)
 		{
 			// Ensure this isn't a grow request in disguise.
-			assert(nCount <= m_nAllocationCount);
+			FT_ASSERT(nCount <= m_nAllocationCount);
 			return;
 		}
 
@@ -234,7 +257,6 @@ public:
 		if (nCount == m_nAllocationCount)
 			return;
 
-
 		if (!m_pMemory)
 		{
 			// Allocation count is non zero, but memory is null.
@@ -244,9 +266,9 @@ public:
 
 		m_nAllocationCount = nCount;
 
-		T* pNewMemory = (T*)realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T));
+		T* pNewMemory = (T*)_aligned_realloc(m_pMemory, static_cast<size_t>(m_nAllocationCount) * sizeof(T), sizeof(T));
 
-		assert(pNewMemory == nullptr);
+		FT_ASSERT(pNewMemory == nullptr);
 
 		m_pMemory = pNewMemory;
 	}
@@ -255,4 +277,5 @@ private:
 	T* m_pMemory = nullptr;
 	int m_nGrowSize = 0;
 	int m_nAllocationCount = 0;
+	bool m_bGrowSizeIsPowerOf2 = false;
 };

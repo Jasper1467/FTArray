@@ -1,4 +1,3 @@
-#include <iostream>
 #include <chrono>
 
 #include "include/FTArray.h"
@@ -13,7 +12,7 @@ double mticks()
 	return elapsed.count();
 }
 
-#define TEST_AMOUNT 1000
+#define TEST_AMOUNT 10000
 
 double g_dbResults[TEST_AMOUNT] = {};
 

@@ -1,5 +1,4 @@
 #pragma once
-#include <cassert>
 #include <random>
 #include <thread>
 #include <vector>
@@ -31,21 +30,24 @@ private:
 
 	int InsertBefore(const int nIndex)
 	{
-		assert(nIndex == GetSize() || IsValidIndex(nIndex));
+		FT_ASSERT(nIndex == GetSize() || IsValidIndex(nIndex));
 
 		Grow();
 		ShiftRight(nIndex);
 		Construct(&At(nIndex));
+
 		return nIndex;
 	}
 
 	int InsertBefore(const int nIndex, const T& src)
 	{
-		assert(nIndex == GetSize() || IsValidIndex(nIndex));
+		FT_ASSERT(nIndex == GetSize() || IsValidIndex(nIndex));
 
 		Grow();
 		ShiftRight(nIndex);
+
 		CopyConstruct(&At(nIndex), src);
+
 		return nIndex;
 	}
 
@@ -55,12 +57,16 @@ public:
 		this->m_Memory = Other.m_Memory;
 		this->m_nSize = Other.m_nSize;
 		this->m_pElements = Other.m_pElements;
+
+		m_bIsNumeric = std::is_arithmetic<T>();
 	}
 
 	FTArray(std::initializer_list<T> List)
 	{
 		for (auto Item : List)
 			AddBack(Item);
+
+		m_bIsNumeric = std::is_arithmetic<T>();
 	}
 
 	T* GetBase()
@@ -88,7 +94,7 @@ public:
 		return At(nIndex);
 	}
 
-	const T& operator[](int nIndex) const
+	const T& operator[](const int nIndex) const
 	{
 		return At(nIndex);
 	}
@@ -103,6 +109,7 @@ public:
 		{
 			Destruct(&At(i));
 		}
+
 		m_nSize = 0;
 		m_Memory.Purge();
 		m_pElements = nullptr;
@@ -118,35 +125,62 @@ public:
 		return *this;
 	}
 
-	bool IsValidIndex(const int nIndex) const
+	bool IsValidIndex(const unsigned int nIndex) const
 	{
-		return (nIndex >= 0) && (nIndex < m_nSize);
+		return nIndex < static_cast<unsigned int>(m_nSize);
 	}
 
-	void ShiftRight(const int nIndex, int nNum = 1)
+	void ShiftRight(const int nIndex, const int nNum = 1)
 	{
-		assert(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
+		FT_ASSERT(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
+
+		if (nNum <= 0)
+			return;
 
 		const int nNumToMove = m_nSize - nIndex - nNum;
-		if ((nNumToMove > 0) && (nNum > 0))
+		if (nNum <= 0)
+			return;
+
+		if (nNum == 1 && m_bIsNumeric)
+		{
+			const int* pSrc = (int*)&At(nIndex);
+			int* pDest = (int*)&At(nIndex + nNum);
+			for (int i = 0; i < nNumToMove; ++i)
+				*pDest++ = *pSrc++;
+		}
+		else
 			memmove(&At(nIndex + nNum), &At(nIndex), nNumToMove * sizeof(T));
 	}
 
-	void ShiftLeft(const int nIndex, int nNum = 1)
+	void ShiftLeft(const int nIndex, const int nNum = 1)
 	{
-		assert(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
+		FT_ASSERT(IsValidIndex(nIndex) || m_nSize == 0 || nNum == 0);
+
+		if (nNum <= 0)
+			return;
 
 		const int nNumToMove = m_nSize - nIndex - nNum;
-		if ((nNumToMove > 0) && (nNum > 0))
+		if (nNum <= 0)
+			return;
+
+		if (nNum == 1 && m_bIsNumeric)
+		{
+			const int* pSrc = (int*)&At(nIndex + nNum);
+			int* pDest = (int*)&At(nIndex);
+			for (int i = 0; i < nNumToMove; ++i)
+				*pDest++ = *pSrc++;
+		}
+		else
 			memmove(&At(nIndex), &At(nIndex + nNum), nNumToMove * sizeof(T));
 	}
 
 	void Grow(const int nNum = 1)
 	{
-		if (m_nSize + nNum > m_Memory.GetAllocationCount())
-			m_Memory.Grow(m_nSize + nNum - m_Memory.GetAllocationCount());
+		const int nNewSize = m_nSize + nNum;
+		if (nNewSize > m_Memory.GetAllocationCount())
+			m_Memory.Grow(nNewSize - m_Memory.GetAllocationCount());
 
-		m_nSize += nNum;
+		m_nSize = nNewSize;
 	}
 
 	int AddFront()
@@ -197,7 +231,7 @@ public:
 				return i;
 		}
 
-		return details::INVALID_INDEX;
+		return FT_INVALID_INDEX;
 	}
 
 	void Remove(const int nIndex)
@@ -280,10 +314,6 @@ public:
 			ChunkStarts[i - 1] + ChunkSizes[
 				static_cast<std::vector<ptrdiff_t, std::allocator<ptrdiff_t>>::size_type>(i) - 1];
 
-		typedef typename std::iterator_traits<FTArrayIterator<T>>::difference_type diff_t;
-		typedef std::uniform_int_distribution<diff_t> distr_t;
-		typedef typename distr_t::param_type param_t;
-
 		std::random_device rd;
 		std::mt19937 gen(rd());
 
@@ -313,7 +343,7 @@ public:
 
 	void QuickSort(int nLow, int nHigh)
 	{
-		auto Partition = [](FTMemory<T>& arr, int low, int high) -> int
+		auto Partition = [](FTMemory<T>& arr, const int low, int high) -> int
 		{
 			T pivot = arr[high];
 			int i = (low - 1);
@@ -331,13 +361,13 @@ public:
 			return (i + 1);
 		};
 
-		assert(isdigit(At(0))); // This function is only for numbers
-		assert(GetSize() < nHigh);
+		FT_ASSERT(IsTypeNumeric()); // This function is only for numbers
+		FT_ASSERT(GetSize() < nHigh);
 
 		if (nLow >= nHigh)
 			return;
 
-		int nPivotPosition = Partition(m_Memory, nLow, nHigh);
+		const int nPivotPosition = Partition(m_Memory, nLow, nHigh);
 
 		QuickSort(nLow, nPivotPosition - 1);
 		QuickSort(nPivotPosition + 1, nHigh);
@@ -345,7 +375,7 @@ public:
 
 	void QuickSort()
 	{
-		assert(isdigit(At(0))); // This function is only for numbers
+		FT_ASSERT(IsTypeNumeric()); // This function is only for numbers
 		QuickSort(0, GetSize() - 1);
 	}
 
@@ -353,4 +383,5 @@ private:
 	FTMemory<T> m_Memory;
 	int m_nSize = 0;
 	T* m_pElements = nullptr;
+	bool m_bIsNumeric = false;
 };
