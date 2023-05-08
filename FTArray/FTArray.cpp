@@ -12,7 +12,7 @@ double mticks()
 	return elapsed.count();
 }
 
-#define TEST_AMOUNT 10000
+#define TEST_AMOUNT 50000
 
 double g_dbResults[TEST_AMOUNT] = {};
 
